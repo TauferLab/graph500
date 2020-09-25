@@ -1,4 +1,4 @@
-CFLAGS = -Drestrict=__restrict__ -O3 -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml
+CFLAGS = -Drestrict=__restrict__ -fopenmp -O3 -ffast-math -maltivec -mtune=power9 -mcpu=power9 -ftree-vectorize -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml
 LDFLAGS = -lpthread
 MPICC = mpicc
 
