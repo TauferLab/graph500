@@ -108,7 +108,7 @@ void requesthndl(int from, void* dat, int sz) {
   int vloc = m->dest_vloc;
   float distance = m->w;
   float udist = glob_dist[uloc];
-  if(udist < glob_maxdelta && udist>=glob_mindelta) {
+  if(udist < glob_maxdelta && udist>=glob_mindelta && udist+distance >= glob_maxdelta) {
     responsemsgs[msg_counter].msg.w = udist+distance;
     responsemsgs[msg_counter].msg.src_vloc = uloc;
     responsemsgs[msg_counter].msg.dest_vloc = vloc;
@@ -162,9 +162,11 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
 
 	unsigned int i,j;
 	long sum=0;
+  unsigned int pull = 0;
+  unsigned int vdegree = 0;
 
   // Delta determines bucket size
-	float delta = 0.25;
+	float delta = 0.059375;
   // Start of bucket
 	glob_mindelta=0.0;
   // End of bucket
@@ -199,8 +201,6 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
 	sum=1; // at least 1 bucket needs to be processed
 
   unsigned int epoch_counter = 0;
-  unsigned int num_settled = 0;
-unsigned int relax_msgs = 0;
   // Epochs
 	int64_t lastvisited=1;
 	while(sum!=0) {
@@ -208,7 +208,6 @@ unsigned int relax_msgs = 0;
 		double t0 = aml_time();
 		nbytes_sent=0;
 #endif
-//num_settled += sum;
 		//1. iterate over light edges
 		while(sum!=0) {
 			CLEAN_VISITED(); // Clear visited list
@@ -216,10 +215,9 @@ unsigned int relax_msgs = 0;
 			aml_barrier(); // Wait till everyone has cleared their lists
 			for(i=0;i<qc;i++) {
 				for(j=rowstarts[q1[i]];j<rowstarts[q1[i]+1];j++) { // Go through edges connected to i
-//					if(weights[j]<delta) // Check if edge weight is less than delta
 					// Check if edge weight is less than delta
-//					if(glob_mindelta <= dist[q1[i]]+weights[j] && dist[q1[i]]+weights[j] < glob_maxdelta) { 
-					if(dist[q1[i]]+weights[j] < glob_maxdelta) { 
+//					if(weights[j]<delta) // Check if edge weight is less than delta
+					if(glob_mindelta <= dist[q1[i]]+weights[j] && dist[q1[i]]+weights[j] < glob_maxdelta) { 
 						send_relax(COLUMN(j),dist[q1[i]]+weights[j],q1[i]); // Relax if necessary
           }
         }
@@ -239,54 +237,40 @@ unsigned int relax_msgs = 0;
 		aml_barrier();
 
 		//2. iterate over S and heavy edges
-		for(i=0; i<g.nlocalverts; i++) {
-      if(dist[i] >= glob_maxdelta || dist[i] < 0) {
-        for(j=rowstarts[i]; j<rowstarts[i+1]; j++) {
-//          if(weights[j] >= delta) {
-          if(dist[i] > glob_mindelta+weights[j] || dist[i] == -1.0) {
-            send_request(weights[j], COLUMN(j), i);
+    if(vdegree > 1) {
+		  for(i=0; i<g.nlocalverts; i++) {
+        if(dist[i] == -1.0 || dist[i] >= glob_maxdelta) {
+          for(j=rowstarts[i]; j<rowstarts[i+1]; j++) {
+//            if(weights[j] >= delta) {
+            if(dist[i] > glob_mindelta+weights[j] || dist[i] == -1.0) {
+              send_request(weights[j], COLUMN(j), i);
+            }
           }
         }
       }
+      aml_barrier();
+      for(i=0; i<msg_counter; i++) {
+        aml_send(&(responsemsgs[i].msg), 3, sizeof(relaxmsg), responsemsgs[i].dst_rank);
+      }
+      aml_barrier();
+      msg_counter = 0;
+    } else {
+		  for(i=0;i<g.nlocalverts;i++) { // Go through local vertices
+        // If current distance of i is in current bucket
+		  	if(dist[i]>=glob_mindelta && dist[i] < glob_maxdelta) { 
+          // Iterate through edges
+		  		for(j=rowstarts[i];j<rowstarts[i+1];j++) {
+            // Check if edge is heavy
+//	  				if(weights[j]>=delta) {// Check if edge is heavy
+		  			if(dist[i]+weights[j]>=glob_maxdelta || weights[j]>=delta) { 
+		  				send_relax(COLUMN(j),dist[i]+weights[j],i); // Send and relax if necessary
+            }
+          }
+		  	}
+      }
+		  aml_barrier(); // Finish processing heavy edges
     }
-    aml_barrier();
-    for(i=0; i<msg_counter; i++) {
-      relax_msgs++;
-      aml_send(&(responsemsgs[i].msg), 3, sizeof(relaxmsg), responsemsgs[i].dst_rank);
-    }
-    aml_barrier();
-    msg_counter = 0;
 
-//		for(i=0;i<g.nlocalverts;i++) { // Go through local vertices
-//      // If current distance of i is in current bucket
-//			if(dist[i]>=glob_mindelta && dist[i] < glob_maxdelta) { 
-//        // Iterate through edges
-//				for(j=rowstarts[i];j<rowstarts[i+1];j++) {
-//          // Check if edge is heavy
-//					if(weights[j]>=delta) {// Check if edge is heavy
-////					if(dist[i]+weights[j]>=glob_maxdelta || weights[j] >= delta) { 
-//						send_relax(COLUMN(j),dist[i]+weights[j],i); // Send and relax if necessary
-//relax_msgs++;
-//          }
-//        }
-//			}
-//    }
-//		aml_barrier(); // Finish processing heavy edges
-
-#ifdef DEBUG
-if(my_pe() == 0 && epoch_counter < 5) {
-  printf("Epoch: %d, phase 2 relax msgs: %u, phase 2 actual relaxations: %u\n", epoch_counter, relax_msgs, counter);
-}
-#endif
-counter = 0;
-relax_msgs = 0;
-//delta+=0.1;
-//if(epoch_counter > 3) {
-//delta = 2.0;
-//}
-if((double)(sum)/(double)(g.nglobalverts) > 0.4) {
-  delta = 1.0;
-}
     // Move to next bucket
 		glob_mindelta=glob_maxdelta;
 		glob_maxdelta+=delta;
@@ -294,13 +278,27 @@ if((double)(sum)/(double)(g.nglobalverts) > 0.4) {
 
 		//3. Bucket processing and checking termination condition
 		int64_t lvlvisited=0; // Debug only
-		for(i=0;i<g.nlocalverts;i++) // Iterate through local vertices
+    vdegree = 0;
+		for(i=0;i<g.nlocalverts;i++) { // Iterate through local vertices
 			if(dist[i]>=glob_mindelta) { // If currect distance is in current bucket
 				sum++; //how many are still to be processed
-				if (dist[i] < glob_maxdelta) // Check if in current bucket
+				if (dist[i] < glob_maxdelta) { // Check if in current bucket
 					q1[qc++]=i; //this is lowest bucket, (add to bucket)
-			} else if(dist[i]!=-1.0) lvlvisited++; // Debug only
+          vdegree += rowstarts[i+1]-rowstarts[i];
+        }
+			} else if(dist[i]!=-1.0) {
+        lvlvisited++; // Debug only
+      }
+    }
 		aml_long_allsum(&sum); // Sum vertices in current bucket
+    aml_long_allsum(&vdegree);
+    int qc_temp = qc;
+    aml_long_allsum(&qc_temp);
+    vdegree /= qc_temp;
+//if(my_pe() == 0) {
+//printf("Approximate vertex degree: %u\n", vdegree);
+//}
+    
 #ifdef DEBUGSTATS
 		t0-=aml_time();
 		aml_long_allsum(&lvlvisited);
