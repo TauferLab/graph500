@@ -1,10 +1,10 @@
 /* Copyright (c) 2011-2017 Graph500 Steering Committee
    All rights reserved.
    Developed by:                Anton Korzh anton@korzh.us
-                                Graph500 Steering Committee
-                                http://www.graph500.org
-   New code under University of Illinois/NCSA Open Source License
-   see license.txt or https://opensource.org/licenses/NCSA
+   Graph500 Steering Committee
+http://www.graph500.org
+New code under University of Illinois/NCSA Open Source License
+see license.txt or https://opensource.org/licenses/NCSA
 */
 
 // Graph500: Kernel 3 SSSP
@@ -60,8 +60,8 @@ typedef struct  __attribute__((__packed__)) relaxmsg {
 } relaxmsg;
 
 typedef struct __attribute__((__packed__)) responsemsg {
-  relaxmsg msg;
-  int dst_rank;
+	relaxmsg msg;
+	int dst_rank;
 } responsemsg;
 
 responsemsg* responsemsgs;
@@ -77,12 +77,12 @@ void relaxhndl(int from, void* dat, int sz) {
 	//check if relaxation is needed: either new path is shorter or vertex not reached earlier
 	if (*dest_dist < 0 || *dest_dist > w) {
 #ifdef DEBUG
-if(!(lightphase && !TEST_VISITEDLOC(vloc))) {
-  if(from == 0) {
-    printf("(%d, %d): (%d,%d) = %f\n", from, my_pe(), m->src_vloc, m->dest_vloc, *dest_dist);
-  }
-  counter++;
-}
+		if(!(lightphase && !TEST_VISITEDLOC(vloc))) {
+			if(from == 0) {
+				printf("(%d, %d): (%d,%d) = %f\n", from, my_pe(), m->src_vloc, m->dest_vloc, *dest_dist);
+			}
+			counter++;
+		}
 #endif
 		*dest_dist = w; //update distance
 		pred_glob[vloc]=VERTEX_TO_GLOBAL(from,m->src_vloc); //update path by setting new parent
@@ -103,23 +103,23 @@ if(!(lightphase && !TEST_VISITEDLOC(vloc))) {
 // Owner of u responds with new distance d'(v) if u in current bucket B_k
 
 void requesthndl(int from, void* dat, int sz) {
-  relaxmsg* m = (relaxmsg*) dat;
-  int uloc = m->src_vloc;
-  int vloc = m->dest_vloc;
-  float distance = m->w;
-  float udist = glob_dist[uloc];
-  if(udist < glob_maxdelta && udist>=glob_mindelta && udist+distance >= glob_maxdelta) {
-    responsemsgs[msg_counter].msg.w = udist+distance;
-    responsemsgs[msg_counter].msg.src_vloc = uloc;
-    responsemsgs[msg_counter].msg.dest_vloc = vloc;
-    responsemsgs[msg_counter].dst_rank = from;
-    msg_counter++; 
+	relaxmsg* m = (relaxmsg*) dat;
+	int uloc = m->src_vloc;
+	int vloc = m->dest_vloc;
+	float distance = m->w;
+	float udist = glob_dist[uloc];
+	if(udist < glob_maxdelta && udist>=glob_mindelta && udist+distance >= glob_maxdelta) {
+		responsemsgs[msg_counter].msg.w = udist+distance;
+		responsemsgs[msg_counter].msg.src_vloc = uloc;
+		responsemsgs[msg_counter].msg.dest_vloc = vloc;
+		responsemsgs[msg_counter].dst_rank = from;
+		msg_counter++; 
 #ifdef DEBUG
-    if(my_pe() == 0) {
-      printf("Request Handler: (%d, %d): (%d,%d) = %f\n", my_pe(), from, m->src_vloc, m->dest_vloc, distance);
-    }
+		if(my_pe() == 0) {
+			printf("Request Handler: (%d, %d): (%d,%d) = %f\n", my_pe(), from, m->src_vloc, m->dest_vloc, distance);
+		}
 #endif
-  }
+	}
 }
 
 void responsehndl(int from, void* dat, int sz) {
@@ -130,12 +130,12 @@ void responsehndl(int from, void* dat, int sz) {
 	//check if relaxation is needed: either new path is shorter or vertex not reached earlier
 	if (dest_dist < 0 || dest_dist > w) {
 #ifdef DEBUG
-if(!(lightphase && !TEST_VISITEDLOC(vloc))) {
-  if(from == 0) {
-    printf("(%d, %d): (%d,%d) = %f\n", from, my_pe(), m->src_vloc, m->dest_vloc, *dest_dist);
-  }
-  counter++;
-}
+		if(!(lightphase && !TEST_VISITEDLOC(vloc))) {
+			if(from == 0) {
+				printf("(%d, %d): (%d,%d) = %f\n", from, my_pe(), m->src_vloc, m->dest_vloc, *dest_dist);
+			}
+			counter++;
+		}
 #endif
 		glob_dist[vloc] = w; //update distance
 		pred_glob[vloc]=VERTEX_TO_GLOBAL(from,m->src_vloc); //update path by setting new parent
@@ -149,59 +149,60 @@ void send_relax(int64_t glob, float weight,int fromloc) {
 }
 
 void send_request(float weight, int64_t src, int dst) {
-  relaxmsg m = {weight, dst, VERTEX_LOCAL(src)};
-  aml_send(&m, 2, sizeof(relaxmsg), VERTEX_OWNER(src));
+	relaxmsg m = {weight, dst, VERTEX_LOCAL(src)};
+	aml_send(&m, 2, sizeof(relaxmsg), VERTEX_OWNER(src));
 }
 
 void send_response(float weight, int src, int64_t dst) {
-  relaxmsg m = {weight, VERTEX_LOCAL(dst), src};
-  aml_send(&m, 3, sizeof(relaxmsg), VERTEX_OWNER(dst));
+	relaxmsg m = {weight, VERTEX_LOCAL(dst), src};
+	aml_send(&m, 3, sizeof(relaxmsg), VERTEX_OWNER(dst));
 }
 
 void run_sssp(int64_t root,int64_t* pred,float *dist) {
 
 	unsigned int i,j;
+	unsigned int old_settled = 0; 
 	long sum=0;
-  unsigned int pull = 0;
-  unsigned int vdegree = 0;
+	unsigned int pull = 0;
+	unsigned int vdegree = 0;
 
-  // Delta determines bucket size
+	// Delta determines bucket size
 	float delta = 0.059375;
-  // Start of bucket
+	// Start of bucket
 	glob_mindelta=0.0;
-  // End of bucket
+	// End of bucket
 	glob_maxdelta=delta;
-  // Distance array
+	// Distance array
 	glob_dist=dist;
 	weights=g.weights;
-  // Vertex array
+	// Vertex array
 	pred_glob=pred;
-  // Index of first free element
-  // light edges: < qc
+	// Index of first free element
+	// light edges: < qc
 	qc=0;q2c=0;
 
-  responsemsgs = xmalloc(4*g.nlocaledges*sizeof(responsemsg));
+	responsemsgs = xmalloc(4*g.nlocaledges*sizeof(responsemsg));
 
 	aml_register_handler(relaxhndl,1);
-  aml_register_handler(requesthndl,2);
-  aml_register_handler(responsehndl,3);
+	aml_register_handler(requesthndl,2);
+	aml_register_handler(responsehndl,3);
 
 	if (VERTEX_OWNER(root) == my_pe()) {
-    // Mark root as visited
+		// Mark root as visited
 		q1[0]=VERTEX_LOCAL(root);
-    // Set index for next visited vertex
+		// Set index for next visited vertex
 		qc=1;
-    // Set root distance to 0
+		// Set root distance to 0
 		dist[VERTEX_LOCAL(root)]=0.0;
-    // Parent of root is root
+		// Parent of root is root
 		pred[VERTEX_LOCAL(root)]=root;
 	}
 
 	aml_barrier();
 	sum=1; // at least 1 bucket needs to be processed
 
-  unsigned int epoch_counter = 0;
-  // Epochs
+	unsigned int epoch_counter = 0;
+	// Epochs
 	int64_t lastvisited=1;
 	while(sum!=0) {
 #ifdef DEBUGSTATS
@@ -216,105 +217,119 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
 			for(i=0;i<qc;i++) {
 				for(j=rowstarts[q1[i]];j<rowstarts[q1[i]+1];j++) { // Go through edges connected to i
 					// Check if edge weight is less than delta
-//					if(weights[j]<delta) // Check if edge weight is less than delta
+					//					if(weights[j]<delta) // Check if edge weight is less than delta
 					if(glob_mindelta <= dist[q1[i]]+weights[j] && dist[q1[i]]+weights[j] < glob_maxdelta) { 
 						send_relax(COLUMN(j),dist[q1[i]]+weights[j],q1[i]); // Relax if necessary
-          }
-        }
-      }
+					}
+				}
+			}
 			aml_barrier(); // Ensure all relaxations/communication is done
 
-      // Switch buffers to edges that need to be reprocessed
+			// Switch buffers to edges that need to be reprocessed
 			qc=q2c;q2c=0;
-      // Swap vertex lists
-      int *tmp=q1;q1=q2;q2=tmp;
-      // Set sum to # of light edges
+			// Swap vertex lists
+			int *tmp=q1;q1=q2;q2=tmp;
+			// Set sum to # of light edges
 			sum=qc;
-      // Global reduction
+
+			// Global reduction
 			aml_long_allsum(&sum);
 		}
 		lightphase=0;
 		aml_barrier();
 
 		//2. iterate over S and heavy edges
-    if(vdegree > 1) {
-		  for(i=0; i<g.nlocalverts; i++) {
-        if(dist[i] == -1.0 || dist[i] >= glob_maxdelta) {
-          for(j=rowstarts[i]; j<rowstarts[i+1]; j++) {
-//            if(weights[j] >= delta) {
-            if(dist[i] > glob_mindelta+weights[j] || dist[i] == -1.0) {
-              send_request(weights[j], COLUMN(j), i);
-            }
-          }
-        }
-      }
-      aml_barrier();
-      for(i=0; i<msg_counter; i++) {
-        aml_send(&(responsemsgs[i].msg), 3, sizeof(relaxmsg), responsemsgs[i].dst_rank);
-      }
-      aml_barrier();
-      msg_counter = 0;
-    } else {
-		  for(i=0;i<g.nlocalverts;i++) { // Go through local vertices
-        // If current distance of i is in current bucket
-		  	if(dist[i]>=glob_mindelta && dist[i] < glob_maxdelta) { 
-          // Iterate through edges
-		  		for(j=rowstarts[i];j<rowstarts[i+1];j++) {
-            // Check if edge is heavy
-//	  				if(weights[j]>=delta) {// Check if edge is heavy
-		  			if(dist[i]+weights[j]>=glob_maxdelta || weights[j]>=delta) { 
-		  				send_relax(COLUMN(j),dist[i]+weights[j],i); // Send and relax if necessary
-            }
-          }
-		  	}
-      }
-		  aml_barrier(); // Finish processing heavy edges
-    }
+		if(vdegree > 1) {
+			for(i=0; i<g.nlocalverts; i++) {
+				if(dist[i] == -1.0 || dist[i] >= glob_maxdelta) {
+					for(j=rowstarts[i]; j<rowstarts[i+1]; j++) {
+						//            if(weights[j] >= delta) {
+						if(dist[i] > glob_mindelta+weights[j] || dist[i] == -1.0) {
+							send_request(weights[j], COLUMN(j), i);
+						}
+					}
+					}
+				}
+				aml_barrier();
+				for(i=0; i<msg_counter; i++) {
+					aml_send(&(responsemsgs[i].msg), 3, sizeof(relaxmsg), responsemsgs[i].dst_rank);
+				}
+				aml_barrier();
+				msg_counter = 0;
+			} else {
+				for(i=0;i<g.nlocalverts;i++) { // Go through local vertices
+					// If current distance of i is in current bucket
+					if(dist[i]>=glob_mindelta && dist[i] < glob_maxdelta) { 
+						// Iterate through edges
+						for(j=rowstarts[i];j<rowstarts[i+1];j++) {
+							// Check if edge is heavy
+							//	  				if(weights[j]>=delta) {// Check if edge is heavy
+							if(dist[i]+weights[j]>=glob_maxdelta || weights[j]>=delta) { 
+								send_relax(COLUMN(j),dist[i]+weights[j],i); // Send and relax if necessary
+							}
+						}
+						}
+					}
+					aml_barrier(); // Finish processing heavy edges
+				}
 
-    // Move to next bucket
-		glob_mindelta=glob_maxdelta;
-		glob_maxdelta+=delta;
-		qc=0;sum=0;
 
-		//3. Bucket processing and checking termination condition
-		int64_t lvlvisited=0; // Debug only
-    vdegree = 0;
-		for(i=0;i<g.nlocalverts;i++) { // Iterate through local vertices
-			if(dist[i]>=glob_mindelta) { // If currect distance is in current bucket
-				sum++; //how many are still to be processed
-				if (dist[i] < glob_maxdelta) { // Check if in current bucket
-					q1[qc++]=i; //this is lowest bucket, (add to bucket)
-          vdegree += rowstarts[i+1]-rowstarts[i];
-        }
-			} else if(dist[i]!=-1.0) {
-        lvlvisited++; // Debug only
-      }
-    }
-		aml_long_allsum(&sum); // Sum vertices in current bucket
-    aml_long_allsum(&vdegree);
-    int qc_temp = qc;
-    aml_long_allsum(&qc_temp);
-    vdegree /= qc_temp;
-//if(my_pe() == 0) {
-//printf("Approximate vertex degree: %u\n", vdegree);
-//}
-    
+				// Move to next bucket
+				glob_mindelta=glob_maxdelta;
+				glob_maxdelta+=delta;
+				qc=0;sum=0;
+
+				bellman_ford(dist, root); // review - might be called in wrong spot
+
+				//3. Bucket processing and checking termination condition
+				int64_t lvlvisited=0; // Debug only
+				vdegree = 0;
+				for(i=0;i<g.nlocalverts;i++) { // Iterate through local vertices
+					if(dist[i]>=glob_mindelta) { // If currect distance is in current bucket
+						sum++; //how many are still to be processed
+						if (dist[i] < glob_maxdelta) { // Check if in current bucket
+							q1[qc++]=i; //this is lowest bucket, (add to bucket)
+							vdegree += rowstarts[i+1]-rowstarts[i];
+						}
+					} else if(dist[i]!=-1.0) {
+						lvlvisited++; // Debug only
+					}
+				}
+
+				aml_long_allsum(&sum); // Sum vertices in current bucket
+				
+								
+				num_settled = g.nglobalverts - sum;
+				if (num_settled > old_settled) delta = 1.0;			
+				old_settled = num_settled; 
+
+
+
+				aml_long_allsum(&vdegree);
+				int qc_temp = qc;
+				aml_long_allsum(&qc_temp);
+				vdegree /= qc_temp;
+				//if(my_pe() == 0) {
+				//printf("Approximate vertex degree: %u\n", vdegree);
+				//}
+
 #ifdef DEBUGSTATS
-		t0-=aml_time();
-		aml_long_allsum(&lvlvisited);
-		aml_long_allsum(&nbytes_sent);
-		if(!my_pe()) printf("--lvl[%1.2f..%1.2f] visited %lld (total %llu) in %5.2fs, network aggr %5.2fGb/s\n",glob_mindelta,glob_maxdelta,lvlvisited-lastvisited,lvlvisited,-t0,-(double)nbytes_sent*8.0/(1.e9*t0));
-		lastvisited = lvlvisited;
+				t0-=aml_time();
+				aml_long_allsum(&lvlvisited);
+				aml_long_allsum(&nbytes_sent);
+				if(!my_pe()) printf("--lvl[%1.2f..%1.2f] visited %lld (total %llu) in %5.2fs, network aggr %5.2fGb/s\n",glob_mindelta,glob_maxdelta,lvlvisited-lastvisited,lvlvisited,-t0,-(double)nbytes_sent*8.0/(1.e9*t0));
+				lastvisited = lvlvisited;
 #endif
-    epoch_counter++;
-	}
-  free(responsemsgs);
-//  printf("Number of epochs: %d\n", epoch_counter);
-}
+				epoch_counter++;
+			}
+			free(responsemsgs);
+			//  printf("Number of epochs: %d\n", epoch_counter);
+		}
 
-// Initialize distance
-void clean_shortest(float* dist) {
-	int i;
-	for(i=0;i<g.nlocalverts;i++) dist[i]=-1.0;
-}
+
+		// Initialize distance
+		void clean_shortest(float* dist) {
+			int i;
+			for(i=0;i<g.nlocalverts;i++) dist[i]=-1.0;
+		}
 #endif
