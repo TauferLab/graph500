@@ -73,7 +73,7 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
 	long sum=0;
 
   // Delta determines bucket size
-	float delta = 0.025;
+	float delta = 0.1;
   // Start of bucket
 	glob_mindelta=0.0;
   // End of bucket
