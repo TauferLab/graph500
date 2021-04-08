@@ -18,7 +18,7 @@ float *weights;
 
 
 //user provided function to be called several times to implement kernel 3: single source shortest path
-//function has filled with -1 and 1.0 pred and dist arrays
+//function has filled with -1 and -1.0 pred and dist arrays
 //at exit dist should have shortest distance to root for each vertice otherwise -1
 //pred array should point to next vertie in shortest path or -1 if vertex unreachable
 //pred[VERTEX_LOCAL(root)] should be root and dist should be 0.0
@@ -29,29 +29,33 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
 
     CLEAN_VISITED();
 
-    int heap_size = 0;
-    heap_insert(frontier, &heap_size, root);
+    void* heap = heap_alloc();
+    heap_insert(heap, root, 0);
     pred[root] = root;
     dist[root] = 0.0;
-    SET_VISITED(root);
 
-    while (heap_size > 0) {
-        int v = heap_remove(frontier, &heap_size, dist);
+    while (!heap_empty(heap)) {
+        int v = heap_remove(heap);
+        if (TEST_VISITED(v)) {
+            continue;
+        }
+        SET_VISITED(v);
         float dist_v = dist[v];
 
         for(long j=rowstarts[v];j<rowstarts[v+1];j++) {
             int u = COLUMN(j); 
             float w = weights[j];
-            if (dist[u] == -1 || dist_v + w < dist[u]) {
-                dist[u] = dist_v + w;
-                pred[u] = v;
-                if (!TEST_VISITED(u)) {
-                    heap_insert(frontier, &heap_size, u);
-                    SET_VISITED(u);
+            if (!TEST_VISITED(u)) {
+                if (dist[u] == -1 || dist_v + w < dist[u]) {
+                    dist[u] = dist_v + w;
+                    pred[u] = v;
+                    heap_insert(heap, u, dist[u]);
                 }
             }
         }
     }
+
+    heap_free(heap);
 }
 
 //user provided function to prefill dist array with whatever value
