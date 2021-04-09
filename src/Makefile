@@ -1,8 +1,8 @@
-CFLAGS = -Drestrict=__restrict__ -fopenmp -O3 -ffast-math -maltivec -mtune=power9 -mcpu=power9 -ftree-vectorize -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml -g --std=c11
+CFLAGS = -Drestrict=__restrict__ -fopenmp -O3 -ffast-math -maltivec -mtune=power9 -mcpu=power9 -ftree-vectorize -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml -g --std=c11 -flto
 LDFLAGS = -lpthread -g
 MPICC = mpicc
 MPICXX = mpicxx
-CXXFLAGS = -Drestrict=__restrict__ -O3 -ffast-math -maltivec -mtune=power9 -mcpu=power9 -ftree-vectorize -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml -g --std=c++11
+CXXFLAGS = -Drestrict=__restrict__ -O3 -ffast-math -maltivec -mtune=power9 -mcpu=power9 -ftree-vectorize -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml -g --std=c++11 -flto
 
 all: graph500_reference_bfs_sssp graph500_reference_bfs 
 #graph500_custom_bfs graph500_custom_bfs_sssp

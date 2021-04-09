@@ -20,7 +20,7 @@ int64_t visited_size;
 int *frontier;
 
 int64_t *pred_glob,*column;
-int *rowstarts;
+unsigned int *rowstarts;
 oned_csr_graph g;
 float* weights;
 void* heap;

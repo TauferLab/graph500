@@ -23,7 +23,7 @@ extern int64_t nbytes_sent,nbytes_rcvd;
 extern oned_csr_graph g;
 extern int qc,q2c;
 extern int* q1,*q2;
-extern int* rowstarts;
+extern unsigned int* rowstarts;
 extern int64_t* column,*pred_glob,visited_size;
 extern unsigned long * visited;
 #ifdef SSSP

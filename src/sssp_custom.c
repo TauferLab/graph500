@@ -11,7 +11,7 @@ extern int64_t* column,*pred_glob,visited_size;
 extern unsigned long * visited;
 extern void* heap;
 // Matrix data
-extern int* rowstarts;
+extern unsigned int* rowstarts;
 extern float *weights;
 
 #ifdef SSSP
