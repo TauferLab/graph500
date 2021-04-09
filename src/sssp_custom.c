@@ -9,10 +9,10 @@
 extern oned_csr_graph g;
 extern int64_t* column,*pred_glob,visited_size;
 extern unsigned long * visited;
-extern int *frontier;
+extern void* heap;
 // Matrix data
 extern int* rowstarts;
-float *weights;
+extern float *weights;
 
 #ifdef SSSP
 
@@ -24,28 +24,26 @@ float *weights;
 //pred[VERTEX_LOCAL(root)] should be root and dist should be 0.0
 
 void run_sssp(int64_t root,int64_t* pred,float *dist) {
-	pred_glob=pred;
-	//user code for SSSP
+    pred_glob=pred;
 
     CLEAN_VISITED();
 
-    void* heap = heap_alloc();
     heap_insert(heap, root, 0);
     pred[root] = root;
     dist[root] = 0.0;
 
     while (!heap_empty(heap)) {
         int v = heap_remove(heap);
-        if (TEST_VISITED(v)) {
+        if (TEST_VISITEDLOC(v)) {
             continue;
         }
-        SET_VISITED(v);
+        SET_VISITEDLOC(v);
         float dist_v = dist[v];
 
         for(long j=rowstarts[v];j<rowstarts[v+1];j++) {
             int u = COLUMN(j); 
             float w = weights[j];
-            if (!TEST_VISITED(u)) {
+            if (!TEST_VISITEDLOC(u)) {
                 if (dist[u] == -1 || dist_v + w < dist[u]) {
                     dist[u] = dist_v + w;
                     pred[u] = v;
@@ -54,8 +52,6 @@ void run_sssp(int64_t root,int64_t* pred,float *dist) {
             }
         }
     }
-
-    heap_free(heap);
 }
 
 //user provided function to prefill dist array with whatever value

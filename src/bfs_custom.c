@@ -23,6 +23,7 @@ int64_t *pred_glob,*column;
 int *rowstarts;
 oned_csr_graph g;
 float* weights;
+void* heap;
 
 //user should provide this function which would be called once to do kernel 1: graph convert
 void make_graph_data_structure(const tuple_graph* const tg) {
@@ -31,12 +32,13 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 
 	column=g.column;
 	rowstarts=g.rowstarts;
+	//user code to allocate other buffers for bfs
+	frontier = xmalloc(g.nglobalverts*sizeof(int));
+#ifdef SSSP
 	visited_size = (g.nlocalverts + ulong_bits - 1) / ulong_bits;
 	visited = xmalloc(visited_size*sizeof(unsigned long));
-	//user code to allocate other buffers for bfs
-#ifdef SSSP
     weights=g.weights;
-	frontier = xmalloc(g.nglobalverts*sizeof(int));
+    heap = heap_alloc();
 #endif
 }
 
@@ -44,30 +46,23 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 //pred[] should be root for root, -1 for unrechable vertices
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
-	pred_glob=pred;
-	//user code to do bfs
+    pred_glob=pred;
 
     CLEAN_VISITED();
 
     int queue_start = 0;
     int queue_end = 0;
-    //printf("Enqueing %d\n", root);
     queue_insert(frontier, &queue_start, &queue_end, root);
     pred[root] = root;
-    SET_VISITED(root);
 
     while (queue_start < queue_end) {
         int v = queue_remove(frontier, &queue_start, &queue_end);
-        //printf("Visiting %d\n", v);
 
         for(long j=rowstarts[v];j<rowstarts[v+1];j++) {
             int u = COLUMN(j); 
             if (pred[u] == -1) {
                 pred[u] = v;
-                if (!TEST_VISITED(u)) {
-                    //printf("Enqueing %d\n", u);
-                    queue_insert(frontier, &queue_start, &queue_end, u);
-                }
+                queue_insert(frontier, &queue_start, &queue_end, u);
             }
         }
     }
@@ -97,9 +92,10 @@ void clean_pred(int64_t* pred) {
 //user provided function to be called once graph is no longer needed
 void free_graph_data_structure(void) {
 	free_oned_csr_graph(&g);
-	free(visited);
-#ifdef SSSP
     free(frontier);
+#ifdef SSSP
+	free(visited);
+    heap_free(heap);
 #endif
 }
 

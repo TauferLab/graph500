@@ -8,6 +8,8 @@
 /*           Andrew Lumsdaine                                              */
 /*           Anton Korzh                                                   */
 
+#include <string.h>
+
 #define ulong_bits 64
 #define ulong_mask &63
 #define ulong_shift >>6
