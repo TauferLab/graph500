@@ -11,7 +11,7 @@
 // Simple two-pass CRS construction using Active Messages
 
 #include "common.h"
-#include "csr_reference.h"
+#include "csr_custom.h"
 #include "aml.h"
 #include <stdint.h>
 #include <inttypes.h>
@@ -80,7 +80,7 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	int64_t nvert=tg->nglobaledges/2;
 	nvert/=num_pes();
 	nvert+=1;
-	degrees=xcalloc(nvert,sizeof(int));
+	degrees=(int*) xcalloc(nvert,sizeof(int));
 
 	aml_register_handler(halfedgehndl,1);
 	int numiters=ITERATE_TUPLE_GRAPH_BLOCK_COUNT(tg);
@@ -131,7 +131,7 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 
 	g->notisolated=g->nglobalverts-isolated;
 #endif
-	unsigned int *rowstarts = xmalloc((nlocalverts + 1) * sizeof(int));
+	unsigned int *rowstarts = (unsigned int*) xmalloc((nlocalverts + 1) * sizeof(int));
 	g->rowstarts = rowstarts;
 
 	rowstarts[0] = 0;
@@ -147,10 +147,10 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	colalloc += (4095);
 	colalloc /= 4096;
 	colalloc *= 4096;
-	column = xmalloc(colalloc);
+	column = (int64_t*) xmalloc(colalloc);
 	aml_barrier();
 #ifdef SSSP
-	weights = xmalloc(4*nlocaledges);
+	weights = (float*) xmalloc(4*nlocaledges);
 	g->weights = weights;
 	aml_barrier();
 #endif

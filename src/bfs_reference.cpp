@@ -36,7 +36,7 @@ unsigned long *visited;
 int64_t visited_size;
 
 //global variables of CSR graph to be used inside of AM-handlers
-int64_t *column;
+extern int64_t *column;
 int64_t *pred_glob;
 unsigned int * rowstarts;
 
@@ -50,7 +50,7 @@ typedef struct visitmsg {
 
 //AM-handler for check&visit
 void visithndl(int from,void* data,int sz) {
-	visitmsg *m = data;
+	visitmsg *m = (visitmsg*)data;
 	if (!TEST_VISITEDLOC(m->vloc)) {
 		SET_VISITEDLOC(m->vloc);
 		q2[q2c++] = m->vloc;
@@ -71,10 +71,10 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 
 	visited_size = (g.nlocalverts + ulong_bits - 1) / ulong_bits;
 	aml_register_handler(visithndl,1);
-	q1 = xmalloc(g.nlocalverts*sizeof(int)); //100% of vertexes
-	q2 = xmalloc(g.nlocalverts*sizeof(int));
+	q1 = (int*) xmalloc(g.nlocalverts*sizeof(int)); //100% of vertexes
+	q2 = (int*) xmalloc(g.nlocalverts*sizeof(int));
 	for(i=0;i<g.nlocalverts;i++) q1[i]=0,q2[i]=0; //touch memory
-	visited = xmalloc(visited_size*sizeof(unsigned long));
+	visited = (unsigned long*) xmalloc(visited_size*sizeof(unsigned long));
 }
 
 void run_bfs(int64_t root, int64_t* pred) {
@@ -129,13 +129,15 @@ void run_bfs(int64_t root, int64_t* pred) {
 void get_edge_count_for_teps(int64_t* edge_visit_count) {
 	long i,j;
 	long edge_count=0;
-	for(i=0;i<g.nlocalverts;i++)
+	for(i=0;i<g.nlocalverts;i++) {
 		if(pred_glob[i]!=-1) {
-			for(j=rowstarts[i];j<rowstarts[i+1];j++)
-				if(COLUMN(j)<=VERTEX_TO_GLOBAL(my_pe(),i))
+			for(j=rowstarts[i];j<rowstarts[i+1];j++) {
+				if(COLUMN(j)<=VERTEX_TO_GLOBAL(my_pe(),i)) {
 					edge_count++;
-
+				}
+			}
 		}
+	}
 
 	aml_long_allsum(&edge_count);
 	*edge_visit_count=edge_count;
@@ -154,4 +156,3 @@ void free_graph_data_structure(void) {
 size_t get_nlocalverts_for_pred(void) {
 	return g.nlocalverts;
 }
-

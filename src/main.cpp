@@ -19,7 +19,7 @@
 #endif
 #include "../generator/make_graph.h"
 #include "../generator/utils.h"
-#include "aml.h"
+#include "../aml/aml.h"
 #include "common.h"
 #include <math.h>
 #include <assert.h>
@@ -69,6 +69,7 @@ void get_statistics(const double x[], int n, volatile double r[s_LAST]) {
 
 int main(int argc, char** argv) {
 	aml_init(&argc,&argv); //includes MPI_Init inside
+//	int rank, size, lgsize;
 	setup_globals();
 
 	/* Parse arguments. */
@@ -89,7 +90,7 @@ int main(int argc, char** argv) {
 	int wmode;
 	char *wfilename=NULL;  
 	if(filename!=NULL) {
-		wfilename=malloc(strlen(filename)+9);
+		wfilename=(char*) malloc(strlen(filename)+9);
 		wfilename[0]='\0';strcat(wfilename,filename);strcat(wfilename,".weights");
 	}
 #endif
@@ -344,20 +345,20 @@ int main(int argc, char** argv) {
 	int64_t* pred = (int64_t*)xMPI_Alloc_mem(nlocalverts * sizeof(int64_t));
 	float* shortest = (float*)xMPI_Alloc_mem(nlocalverts * sizeof(float));
 
-
 	int bfs_root_idx,i;
 	if (!getenv("SKIP_BFS")) {
 		clean_pred(&pred[0]); //user-provided function from bfs_implementation.c
 		run_bfs(bfs_roots[0], &pred[0]); //warm-up
 #ifdef ENERGYLOOP_BFS
-                int eloop;
-                if(!my_pe()) printf("starting energy loop BFS\n");
-                for(eloop=0;eloop<1000000;eloop++)
-                        for (bfs_root_idx = 0; bfs_root_idx < num_bfs_roots; ++bfs_root_idx) {
-                clean_pred(&pred[0]);
-                run_bfs(bfs_roots[bfs_root_idx], &pred[0]);
-                }
-                if(!my_pe()) printf("finished energy loop BFS\n");
+        int eloop;
+        if(!my_pe()) printf("starting energy loop BFS\n");
+        for(eloop=0;eloop<1000000;eloop++) {
+            for (bfs_root_idx = 0; bfs_root_idx < num_bfs_roots; ++bfs_root_idx) {
+        		clean_pred(&pred[0]);
+        		run_bfs(bfs_roots[bfs_root_idx], &pred[0]);
+        	}
+		}
+        if(!my_pe()) printf("finished energy loop BFS\n");
 #endif
 		if (!getenv("SKIP_VALIDATION")) {
 			int64_t nedges=0;
@@ -397,10 +398,10 @@ int main(int argc, char** argv) {
 					if (rank == 0) fprintf(stderr, "Validation failed for this BFS root; skipping rest.\n");
 					break;
 				}
-			} else
+			} else {
 				validate_times[bfs_root_idx] = -1;
+			}
 		}
-
 	}
 #ifdef SSSP
 	double* sssp_times = (double*)xmalloc(num_bfs_roots * sizeof(double));
@@ -410,15 +411,16 @@ int main(int argc, char** argv) {
 	clean_pred(pred);
 	run_sssp(bfs_roots[0], &pred[0],shortest); //warm-up
 #ifdef ENERGYLOOP_SSSP
-		int eloop;
-		if(!my_pe()) printf("starting energy loop SSSP\n");
-		for(eloop=0;eloop<1000000;eloop++)
-			for (bfs_root_idx = 0; bfs_root_idx < num_bfs_roots; ++bfs_root_idx) {
-				clean_shortest(shortest);
-				clean_pred(&pred[0]);
-				run_sssp(bfs_roots[bfs_root_idx], &pred[0],shortest);
+	int eloop;
+	if(!my_pe()) printf("starting energy loop SSSP\n");
+	for(eloop=0;eloop<1000000;eloop++) {
+		for (bfs_root_idx = 0; bfs_root_idx < num_bfs_roots; ++bfs_root_idx) {
+			clean_shortest(shortest);
+			clean_pred(&pred[0]);
+			run_sssp(bfs_roots[bfs_root_idx], &pred[0],shortest);
 		}
-		if(!my_pe()) printf("finished energy loop SSSP\n");
+	}
+	if(!my_pe()) printf("finished energy loop SSSP\n");
 #endif
 	for (bfs_root_idx = 0; bfs_root_idx < num_bfs_roots; ++bfs_root_idx) {
 		int64_t root = bfs_roots[bfs_root_idx];

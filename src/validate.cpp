@@ -57,7 +57,8 @@ int64_t maxvertex;
 void frompredhndl(int from,void* data,int sz) { 
 	int vfrom = *(int*)data;
 	int64_t predfrom = VERTEX_TO_GLOBAL(from,vfrom);
-	int vloc = *(int*)(data+4);
+//	int vloc = *(int*)(data+4);
+	int vloc = *((int*)(data)+1);
 
 	if(globpred[vloc] == predfrom && globdist[vloc]==FLT_MAX) globdist[vloc]=prevlevel+1.0,newvisits++;
 }
@@ -79,7 +80,8 @@ void send_half (int64_t src) {
 
 void vfulledgehndl(int frompe,void* data,int sz) {
 	int vloc = *(int*)data;
-	int64_t gtgt = *((int64_t*)(data+4));
+//	int64_t gtgt = *((int64_t*)(data+4));
+	int64_t gtgt = *(((int64_t*)(data)+1));
 	int next = vdegrees[vloc]++;
 	SETCOLUMN(next,gtgt);
 #ifdef SSSP
@@ -184,14 +186,14 @@ int validate_result(int isbfs,const tuple_graph* const tg, const size_t nlocalve
 	size_t i,j,k;
 	if(firstvalidationrun) {
 		firstvalidationrun=0;
-		confirmed = xmalloc(nlocalverts*sizeof(int));
+		confirmed = (int*) xmalloc(nlocalverts*sizeof(int));
 #ifdef REUSE_CSR_FOR_VALIDATION
 vrowstarts=rowstarts;
 #ifdef SSSP
 vweights=weights;
 #endif
 #else
-		vdegrees=xcalloc(nlocalverts,sizeof(int));
+		vdegrees=(unsigned int*)xcalloc(nlocalverts,sizeof(int));
 
 		aml_register_handler(vhalfedgehndl,1);
 
@@ -209,7 +211,7 @@ vweights=weights;
 			aml_barrier();
 		} ITERATE_TUPLE_GRAPH_END;
 
-		vrowstarts = xmalloc((nlocalverts + 1) * sizeof(int));
+		vrowstarts = (unsigned int*) xmalloc((nlocalverts + 1) * sizeof(int));
 
 		vrowstarts[0] = 0;
 		for (i = 0; i < nlocalverts; ++i) {
@@ -217,7 +219,7 @@ vweights=weights;
 			vdegrees[i] = vrowstarts[i];
 		}
 
-		vcolumn = xmalloc(8*vrowstarts[nlocalverts]);
+		vcolumn = (int64_t*) xmalloc(8*vrowstarts[nlocalverts]);
 #ifdef SSSP
 		vweights = xmalloc(4*vrowstarts[nlocalverts]);
 #endif

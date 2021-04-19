@@ -140,7 +140,8 @@ static MPI_Request rqsend_intra[NSEND_intra];
 static char recvbuf_intra[AGGR_intra*NRECV_intra];
 static MPI_Request rqrecv_intra[NRECV_intra];
 volatile static int ack_intra=0;
-inline void aml_send_intra(void *srcaddr, int type, int length, int local ,int from);
+//inline void aml_send_intra(void *srcaddr, int type, int length, int local ,int from);
+void aml_send_intra(void *srcaddr, int type, int length, int local ,int from);
 
 void aml_finalize(void);
 void aml_barrier(void);
@@ -158,7 +159,7 @@ static void process(int fromgroup,int length ,char* message) {
 	int from = PROC_FROM_GROUPLOCAL(fromgroup,mylocal);
 	while ( i < length ) {
 		void* m = message+i;
-		struct hdr *h = m;
+		struct hdr *h = (struct hdr*) m;
 		int hsz=h->sz;
 		int hndl=h->hndl;
 		int destlocal = LOCAL_FROM_PROC(h->routing);
@@ -180,7 +181,7 @@ static void process_intra(int fromlocal,int length ,char* message) {
 	int i=0;
 	while ( i < length ) {
 		void*m = message+i;
-		struct hdri *h = m;
+		struct hdri *h = (struct hdri*) m;
 		int hsz=h->sz;
 		int hndl=h->hndl;
 		aml_handlers[hndl](PROC_FROM_GROUPLOCAL((int)(h->routing),fromlocal),m+sizeof(struct hdri),hsz);
@@ -189,7 +190,8 @@ static void process_intra(int fromlocal,int length ,char* message) {
 }
 
 // poll intranode message
-inline void aml_poll_intra(void) {
+//inline void aml_poll_intra(void) {
+void aml_poll_intra(void) {
 	int flag, from, length,index;
 	MPI_Status status;
 	MPI_Testany( NRECV_intra,rqrecv_intra, &index, &flag, &status );
@@ -232,7 +234,8 @@ static void aml_poll(void) {
 }
 
 //flush internode buffer to destination node
-inline void flush_buffer( int node ) {
+//inline void flush_buffer( int node ) {
+void flush_buffer( int node ) {
 	MPI_Status stsend;
 	int flag=0,index,tmp;
 	if (sendsize[node] == 0 && acks[node]==0 ) return;
@@ -249,7 +252,8 @@ inline void flush_buffer( int node ) {
 
 }
 //flush intranode buffer, NB:node is local number of pe in group
-inline void flush_buffer_intra( int node ) {
+//inline void flush_buffer_intra( int node ) {
+void flush_buffer_intra( int node ) {
 	MPI_Status stsend;
 	int flag=0,index,tmp;
 	if (sendsize_intra[node] == 0 && acks_intra[node]==0 ) return;
@@ -266,14 +270,15 @@ inline void flush_buffer_intra( int node ) {
 
 }
 
-inline void aml_send_intra(void *src, int type, int length, int local, int from) {
+//inline void aml_send_intra(void *src, int type, int length, int local, int from) {
+void aml_send_intra(void *src, int type, int length, int local, int from) {
 	//send to _another_ process from same group
 	int nmax = AGGR_intra - sendsize_intra[local] - sizeof(struct hdri);
 	if ( nmax < length ) {
 		flush_buffer_intra(local);
 	}
 	char* dst = (SENDSOURCE_intra(local)+sendsize_intra[local]);
-	struct hdri *h=(void*)dst;
+	struct hdri *h=(struct hdri*)dst;
 	h->routing = GROUP_FROM_PROC(from);
 	h->sz=length;
 	h->hndl = type;
@@ -299,7 +304,7 @@ SOATTR void aml_send(void *src, int type,int length, int node ) {
 		flush_buffer(group);
 	}
 	char* dst = (SENDSOURCE(group)+sendsize[group]);
-	struct hdr *h=(void*)dst;
+	struct hdr *h=(struct hdr*)dst;
 	h->routing = local;
 	h->hndl = type;
 	h->sz=length;
@@ -309,7 +314,7 @@ SOATTR void aml_send(void *src, int type,int length, int node ) {
 
 
 int stringCmp( const void *a, const void *b)
-{ return strcmp(a,b);  }
+{ return strcmp((const char*) a,(const char*) b);  }
 
 // Should be called by user instead of MPI_Init()
 SOATTR int aml_init( int *argc, char ***argv ) {
@@ -385,14 +390,14 @@ SOATTR int aml_init( int *argc, char ***argv ) {
 		r = MPI_Recv_init( recvbuf+AGGR*i, AGGR, MPI_CHAR,MPI_ANY_SOURCE, MPI_ANY_TAG, comm,rqrecv+i );
 		if ( r != MPI_SUCCESS ) return r;
 	}
-	sendbuf = malloc( AGGR*(num_groups+NSEND));
+	sendbuf = (char*) malloc( AGGR*(num_groups+NSEND));
 	if ( !sendbuf ) return -1;
 	memset(sendbuf,0,AGGR*(num_groups+NSEND));
-	sendsize = malloc( num_groups*sizeof(*sendsize) );
+	sendsize = (int*) malloc( num_groups*sizeof(*sendsize) );
 	if (!sendsize) return -1;
-	acks = malloc( num_groups*sizeof(*acks) );
+	acks = (short unsigned int*) malloc( num_groups*sizeof(*acks) );
 	if (!acks) return -1;
-	nbuf = malloc( num_groups*sizeof(*nbuf) );
+	nbuf = (short unsigned int*) malloc( num_groups*sizeof(*nbuf) );
 	if (!nbuf) return -1;
 
 
@@ -400,14 +405,14 @@ SOATTR int aml_init( int *argc, char ***argv ) {
 		r = MPI_Recv_init( recvbuf_intra+AGGR_intra*i, AGGR_intra, MPI_CHAR,MPI_ANY_SOURCE, MPI_ANY_TAG, comm_intra,rqrecv_intra+i );
 		if ( r != MPI_SUCCESS ) return r;
 	}
-	sendbuf_intra = malloc( AGGR_intra*(group_size+NSEND_intra));
+	sendbuf_intra = (char*) malloc( AGGR_intra*(group_size+NSEND_intra));
 	if ( !sendbuf_intra ) return -1;
 	memset(sendbuf_intra,0,AGGR_intra*(group_size+NSEND_intra));
-	sendsize_intra = malloc( group_size*sizeof(*sendsize_intra) );
+	sendsize_intra = (int*) malloc( group_size*sizeof(*sendsize_intra) );
 	if (!sendsize_intra) return -1;
-	acks_intra = malloc( group_size*sizeof(*acks_intra) );
+	acks_intra = (short unsigned int*) malloc( group_size*sizeof(*acks_intra) );
 	if (!acks_intra) return -1;
-	nbuf_intra = malloc( group_size*sizeof(*nbuf_intra) );
+	nbuf_intra = (short unsigned int*) malloc( group_size*sizeof(*nbuf_intra) );
 	if (!nbuf_intra) return -1;
 	for ( j = 0; j < group_size; j++ ) {
 		sendsize_intra[j] = 0; nbuf_intra[j] = j; acks_intra[j]=0;

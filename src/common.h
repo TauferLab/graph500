@@ -11,6 +11,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <Kokkos_Core.hpp>
 #include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
@@ -215,7 +216,7 @@ typedef struct tuple_graph {
 					extern "C" {
 #endif
 
-						void setup_globals(void); /* In utils.c */
+						void setup_globals(); /* In utils.c */
 						void cleanup_globals(void); /* In utils.c */
 						int lg_int64_t(int64_t x); /* In utils.c */
 						void* xMPI_Alloc_mem(size_t nbytes); /* In utils.c */
@@ -231,11 +232,16 @@ typedef struct tuple_graph {
 						void run_bfs(int64_t root, int64_t* pred);
 						void get_edge_count_for_teps(int64_t* edge_visit_count);
 						void clean_pred(int64_t* pred);
+						void clean_pred_kokkos(Kokkos::View<int64_t*>& pred);
 						size_t get_nlocalverts_for_pred(void);
 						/* Definitions in SSSP file in case this kernel is implemented */
 #ifdef SSSP
+						void setup_sssp_kokkos_globals();
 						void run_sssp(int64_t root, int64_t* pred, float * dist_shortest);
+						void run_sssp_openmp(int64_t root, int64_t* pred, float * dist_shortest);
+						void run_sssp_kokkos(int64_t root, Kokkos::View<int64_t*>& pred, Kokkos::View<float*>& dist);
 						void clean_shortest(float * dist);
+						void clean_shortest_kokkos(Kokkos::View<float*>& shortest);
 #endif
 
 						static inline size_t size_min(size_t a, size_t b) {
