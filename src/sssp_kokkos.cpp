@@ -60,6 +60,27 @@ Kokkos::View<int64_t*> column_kokkos, pred_glob_kokkos;
 Kokkos::View<int64_t[1]> visited_size_kokkos;
 Kokkos::View<unsigned long*> visited_kokkos;
 Kokkos::View<float*> weights_kokkos, *glob_dist_kokkos;
+// Relax/request views
+Kokkos::View<float*> relaxmsgs_d_w;
+Kokkos::View<int*> 	 relaxmsgs_d_dst_vloc;
+Kokkos::View<int*> 	 relaxmsgs_d_src_vloc;
+Kokkos::View<float*> requestmsgs_d_w;
+Kokkos::View<float*> requestmsgs_d_dv;
+Kokkos::View<int*>   requestmsgs_d_dst_vloc;
+Kokkos::View<int*>   requestmsgs_d_src_vloc;
+// Host mirrors
+Kokkos::View<float*>::HostMirror relaxmsgs_h_w;
+Kokkos::View<int*>::HostMirror   relaxmsgs_h_dst_vloc;
+Kokkos::View<int*>::HostMirror   relaxmsgs_h_src_vloc;
+Kokkos::View<float*>::HostMirror requestmsgs_h_w;
+Kokkos::View<float*>::HostMirror requestmsgs_h_dv;
+Kokkos::View<int*>::HostMirror   requestmsgs_h_dst_vloc;
+Kokkos::View<int*>::HostMirror   requestmsgs_h_src_vloc;
+// Counters
+Kokkos::View<int[1]> relaxcounter;
+Kokkos::View<int[1]> requestcounter;
+Kokkos::View<int[1]>::HostMirror relaxcounter_host;
+Kokkos::View<int[1]>::HostMirror requestcounter_host;
 
 void setup_sssp_kokkos_globals() {
 	// Declare Views
@@ -120,6 +141,27 @@ void setup_sssp_kokkos_globals() {
 		visited_host(i) = visited[i];
 	});
 	Kokkos::deep_copy(visited_kokkos, visited_host);
+	// Relax/request views
+	relaxmsgs_d_w = Kokkos::View<float*>("Relax message weight", g.nlocaledges);
+	relaxmsgs_d_dst_vloc = Kokkos::View<int*>("Relax message dst_vloc", g.nlocaledges);
+	relaxmsgs_d_src_vloc = Kokkos::View<int*>("Relax message dst_vloc", g.nlocaledges);
+	requestmsgs_d_w = Kokkos::View<float*>("request message weight", g.nlocaledges);
+	requestmsgs_d_dv = Kokkos::View<float*>("request message dv", g.nlocaledges);
+	requestmsgs_d_dst_vloc = Kokkos::View<int*>("request message dst_vloc", g.nlocaledges);
+	requestmsgs_d_src_vloc = Kokkos::View<int*>("request message dst_vloc", g.nlocaledges);
+	// Host mirrors
+	relaxmsgs_h_w = Kokkos::create_mirror_view(relaxmsgs_d_w);
+	relaxmsgs_h_dst_vloc = Kokkos::create_mirror_view(relaxmsgs_d_dst_vloc);
+	relaxmsgs_h_src_vloc = Kokkos::create_mirror_view(relaxmsgs_d_src_vloc);
+	requestmsgs_h_w = Kokkos::create_mirror_view(requestmsgs_d_w);
+	requestmsgs_h_dv = Kokkos::create_mirror_view(requestmsgs_d_dv);
+	requestmsgs_h_dst_vloc = Kokkos::create_mirror_view(requestmsgs_d_dst_vloc);
+	requestmsgs_h_src_vloc = Kokkos::create_mirror_view(requestmsgs_d_src_vloc);
+	// Counters
+	relaxcounter = Kokkos::View<int[1]>("Relaxation counter");
+	requestcounter = Kokkos::View<int[1]>("Request counter");
+	relaxcounter_host = Kokkos::create_mirror_view(relaxcounter);
+	requestcounter_host = Kokkos::create_mirror_view(requestcounter);
 }
 
 //Relaxation data type 
@@ -322,27 +364,27 @@ void run_sssp_kokkos(int64_t root,Kokkos::View<int64_t*>& pred, Kokkos::View<flo
 //printf("Rank %d initialized scalars\n", rank);
 
 	responsemsgs = (responsemsg*) xmalloc(4*g.nlocaledges*sizeof(responsemsg));
-	// Relax/request views
-	Kokkos::View<float*> relaxmsgs_d_w("Relax message weight", g.nlocaledges);
-	Kokkos::View<int*> 	 relaxmsgs_d_dst_vloc("Relax message dst_vloc", g.nlocaledges);
-	Kokkos::View<int*> 	 relaxmsgs_d_src_vloc("Relax message dst_vloc", g.nlocaledges);
-	Kokkos::View<float*> requestmsgs_d_w("request message weight", g.nlocaledges);
-	Kokkos::View<float*> requestmsgs_d_dv("request message dv", g.nlocaledges);
-	Kokkos::View<int*>   requestmsgs_d_dst_vloc("request message dst_vloc", g.nlocaledges);
-	Kokkos::View<int*>   requestmsgs_d_src_vloc("request message dst_vloc", g.nlocaledges);
-	// Host mirrors
-	Kokkos::View<float*>::HostMirror relaxmsgs_h_w = Kokkos::create_mirror_view(relaxmsgs_d_w);
-	Kokkos::View<int*>::HostMirror   relaxmsgs_h_dst_vloc = Kokkos::create_mirror_view(relaxmsgs_d_dst_vloc);
-	Kokkos::View<int*>::HostMirror   relaxmsgs_h_src_vloc = Kokkos::create_mirror_view(relaxmsgs_d_src_vloc);
-	Kokkos::View<float*>::HostMirror requestmsgs_h_w = Kokkos::create_mirror_view(requestmsgs_d_w);
-	Kokkos::View<float*>::HostMirror requestmsgs_h_dv = Kokkos::create_mirror_view(requestmsgs_d_dv);
-	Kokkos::View<int*>::HostMirror   requestmsgs_h_dst_vloc = Kokkos::create_mirror_view(requestmsgs_d_dst_vloc);
-	Kokkos::View<int*>::HostMirror   requestmsgs_h_src_vloc = Kokkos::create_mirror_view(requestmsgs_d_src_vloc);
-	// Counters
-	Kokkos::View<int[1]> relaxcounter = Kokkos::View<int[1]>("Relaxation counter");
-	Kokkos::View<int[1]> requestcounter = Kokkos::View<int[1]>("Request counter");
-	Kokkos::View<int[1]>::HostMirror relaxcounter_host = Kokkos::create_mirror_view(relaxcounter);
-	Kokkos::View<int[1]>::HostMirror requestcounter_host = Kokkos::create_mirror_view(requestcounter);
+//	// Relax/request views
+//	Kokkos::View<float*> relaxmsgs_d_w("Relax message weight", g.nlocaledges);
+//	Kokkos::View<int*> 	 relaxmsgs_d_dst_vloc("Relax message dst_vloc", g.nlocaledges);
+//	Kokkos::View<int*> 	 relaxmsgs_d_src_vloc("Relax message dst_vloc", g.nlocaledges);
+//	Kokkos::View<float*> requestmsgs_d_w("request message weight", g.nlocaledges);
+//	Kokkos::View<float*> requestmsgs_d_dv("request message dv", g.nlocaledges);
+//	Kokkos::View<int*>   requestmsgs_d_dst_vloc("request message dst_vloc", g.nlocaledges);
+//	Kokkos::View<int*>   requestmsgs_d_src_vloc("request message dst_vloc", g.nlocaledges);
+//	// Host mirrors
+//	Kokkos::View<float*>::HostMirror relaxmsgs_h_w = Kokkos::create_mirror_view(relaxmsgs_d_w);
+//	Kokkos::View<int*>::HostMirror   relaxmsgs_h_dst_vloc = Kokkos::create_mirror_view(relaxmsgs_d_dst_vloc);
+//	Kokkos::View<int*>::HostMirror   relaxmsgs_h_src_vloc = Kokkos::create_mirror_view(relaxmsgs_d_src_vloc);
+//	Kokkos::View<float*>::HostMirror requestmsgs_h_w = Kokkos::create_mirror_view(requestmsgs_d_w);
+//	Kokkos::View<float*>::HostMirror requestmsgs_h_dv = Kokkos::create_mirror_view(requestmsgs_d_dv);
+//	Kokkos::View<int*>::HostMirror   requestmsgs_h_dst_vloc = Kokkos::create_mirror_view(requestmsgs_d_dst_vloc);
+//	Kokkos::View<int*>::HostMirror   requestmsgs_h_src_vloc = Kokkos::create_mirror_view(requestmsgs_d_src_vloc);
+//	// Counters
+//	Kokkos::View<int[1]> relaxcounter = Kokkos::View<int[1]>("Relaxation counter");
+//	Kokkos::View<int[1]> requestcounter = Kokkos::View<int[1]>("Request counter");
+//	Kokkos::View<int[1]>::HostMirror relaxcounter_host = Kokkos::create_mirror_view(relaxcounter);
+//	Kokkos::View<int[1]>::HostMirror requestcounter_host = Kokkos::create_mirror_view(requestcounter);
 	Kokkos::deep_copy(relaxcounter, 0);
 	Kokkos::deep_copy(requestcounter, 0);
 
@@ -363,8 +405,6 @@ void run_sssp_kokkos(int64_t root,Kokkos::View<int64_t*>& pred, Kokkos::View<flo
 			// Parent of root is root
 			dist(VERTEX_LOCAL(root)) = 0.0;
 			pred(VERTEX_LOCAL(root)) = root;
-//printf("vertex=%ld, vertex_local(129301)=%d, q1[0] = %d, dist(129301)=%f, pred(129301)=%ld\n", 129301, VERTEX_LOCAL(129301), q1[0], dist(VERTEX_LOCAL(129301)), pred(VERTEX_LOCAL(129301)));
-//printf("root=%ld, vertex_local(root)=%d, q1[0] = %d, dist(root)=%f, pred(root)=%ld\n", root, VERTEX_LOCAL(root), q1[0], dist(VERTEX_LOCAL(root)), pred(VERTEX_LOCAL(root)));
 		});
 	}
 //printf("Rank %d done with initial setup\n", rank);
